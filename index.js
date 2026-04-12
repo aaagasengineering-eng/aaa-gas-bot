@@ -450,9 +450,11 @@ Our representative will contact you soon at *03177271509*! 📞
 async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
-  const sock = makeWASocket({
+const sock = makeWASocket({
     auth: state,
     logger: pino({ level: 'silent' }),
+    browser: ['AAA Gas Bot', 'Chrome', '1.0.0'],
+    connectTimeoutMs: 60000,
   });
 
   sock.ev.on('creds.update', saveCreds);
