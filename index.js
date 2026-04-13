@@ -1,79 +1,79 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const express = require('express');
 const qrcode = require('qrcode');
+const P = require('pino');
 
 // ============================================================
-// AAA GAS ENGINEERING - WHATSAPP CHATBOT v3
+// AAA GAS ENGINEERING - WHATSAPP CHATBOT v4
 // ============================================================
 
 const app = express();
 let currentQR = null;
-let botStatus = 'Starting up...';
+let botStatus = 'Starting...';
+let isConnected = false;
 
-// Web server for QR code
 app.get('/', async (req, res) => {
-  if (currentQR) {
-    const qrImage = await qrcode.toDataURL(currentQR);
-    res.send(`
-      <html>
-        <head>
-          <title>AAA Gas Bot - Scan QR</title>
-          <meta http-equiv="refresh" content="30">
-          <style>
-            body { font-family: Arial; text-align: center; padding: 40px; background: #f0f0f0; }
-            img { border: 4px solid #25D366; border-radius: 12px; margin: 20px; }
-            h2 { color: #075E54; }
-            p { color: #555; font-size: 16px; }
-            .status { background: #25D366; color: white; padding: 10px 20px; border-radius: 8px; display: inline-block; margin: 10px; }
-          </style>
-        </head>
-        <body>
-          <h2>🔥 AAA Gas Engineering - WhatsApp Bot</h2>
-          <div class="status">✅ QR Code Ready!</div>
-          <p>Open WhatsApp → Settings → Linked Devices → Link a Device</p>
-          <p>Scan this QR code:</p>
-          <img src="${qrImage}" width="280" height="280"/>
-          <p><small>Page auto-refreshes every 30 seconds. If QR expires, refresh manually.</small></p>
-        </body>
-      </html>
-    `);
-  } else {
-    res.send(`
-      <html>
-        <head>
-          <title>AAA Gas Bot</title>
-          <meta http-equiv="refresh" content="5">
-          <style>
-            body { font-family: Arial; text-align: center; padding: 40px; background: #f0f0f0; }
-            h2 { color: #075E54; }
-            .status { background: #128C7E; color: white; padding: 10px 20px; border-radius: 8px; display: inline-block; margin: 10px; font-size: 18px; }
-          </style>
-        </head>
-        <body>
-          <h2>🔥 AAA Gas Engineering - WhatsApp Bot</h2>
-          <div class="status">${botStatus}</div>
-          <p><small>Page auto-refreshes every 5 seconds...</small></p>
-        </body>
-      </html>
+  if (isConnected) {
+    return res.send(`
+      <html><head><title>AAA Gas Bot</title><meta http-equiv="refresh" content="10">
+      <style>body{font-family:Arial;text-align:center;padding:40px;background:#f0f0f0}
+      .box{background:#25D366;color:white;padding:20px 40px;border-radius:12px;display:inline-block;font-size:22px;margin:20px}</style></head>
+      <body><h2 style="color:#075E54">🔥 AAA Gas Engineering - WhatsApp Bot</h2>
+      <div class="box">🎉 Bot is LIVE and Running!</div>
+      <p>Bot is connected and replying to clients automatically.</p>
+      <p><small>Page refreshes every 10 seconds</small></p></body></html>
     `);
   }
+  if (currentQR) {
+    try {
+      const qrImage = await qrcode.toDataURL(currentQR);
+      return res.send(`
+        <html><head><title>AAA Gas Bot - Scan QR</title><meta http-equiv="refresh" content="20">
+        <style>body{font-family:Arial;text-align:center;padding:40px;background:#f0f0f0}
+        img{border:5px solid #25D366;border-radius:12px;margin:20px}
+        h2{color:#075E54}.step{background:#fff;border-radius:8px;padding:12px;margin:8px auto;max-width:400px;text-align:left}</style></head>
+        <body>
+        <h2>🔥 AAA Gas Engineering - WhatsApp Bot</h2>
+        <p style="background:#25D366;color:white;padding:10px 20px;border-radius:8px;display:inline-block">✅ QR Code Ready — Scan Now!</p>
+        <br><img src="${qrImage}" width="260" height="260"/><br>
+        <div style="max-width:400px;margin:auto">
+          <div class="step">1️⃣ Open WhatsApp on your phone</div>
+          <div class="step">2️⃣ Tap Settings (3 dots)</div>
+          <div class="step">3️⃣ Tap "Linked Devices"</div>
+          <div class="step">4️⃣ Tap "Link a Device"</div>
+          <div class="step">5️⃣ Scan this QR code</div>
+        </div>
+        <p><small>⚠️ QR expires in ~20 seconds. Page auto-refreshes.</small></p>
+        </body></html>
+      `);
+    } catch(e) {
+      return res.send('<p>Generating QR... Please refresh in 5 seconds.</p>');
+    }
+  }
+  res.send(`
+    <html><head><title>AAA Gas Bot</title><meta http-equiv="refresh" content="3">
+    <style>body{font-family:Arial;text-align:center;padding:40px;background:#f0f0f0}h2{color:#075E54}</style></head>
+    <body><h2>🔥 AAA Gas Engineering - WhatsApp Bot</h2>
+    <p style="font-size:18px">⏳ Status: <b>${botStatus}</b></p>
+    <p><small>Page auto-refreshes every 3 seconds...</small></p></body></html>
+  `);
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log('Web server started on port', process.env.PORT || 3000);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log('Web server running on port', PORT));
 
 // ============================================================
-// PRODUCTS DATA
+// PRODUCTS & FAQ
 // ============================================================
 
 const PRODUCTS = [
-  { cap: '10 kg/hr',  big: '2 large daig burners',       small: '4 small burners',        price: 'PKR 65,000',   type: 'Water Bath', maxBig: 2,  maxSmall: 4  },
-  { cap: '15 kg/hr',  big: '2 to 3 large daig burners',  small: '4 to 8 small burners',   price: 'PKR 85,000',   type: 'Water Bath', maxBig: 3,  maxSmall: 8  },
-  { cap: '30 kg/hr',  big: '3 to 6 large daig burners',  small: '8 to 12 small burners',  price: 'PKR 1,20,000', type: 'Water Bath', maxBig: 6,  maxSmall: 12 },
-  { cap: '50 kg/hr',  big: '6 to 9 large daig burners',  small: '12 to 18 small burners', price: 'PKR 1,95,000', type: 'Water Bath', maxBig: 9,  maxSmall: 18 },
-  { cap: '30 kg/hr',  big: '3 to 6 large daig burners',  small: '8 to 12 small burners',  price: 'PKR 2,00,000', type: 'Waterless',  maxBig: 6,  maxSmall: 12 },
-  { cap: '50 kg/hr',  big: '6 to 9 large daig burners',  small: '12 to 18 small burners', price: 'PKR 3,00,000', type: 'Waterless',  maxBig: 9,  maxSmall: 18 },
+  { cap:'10 kg/hr',  big:'2 large daig burners',       small:'4 small burners',        price:'PKR 65,000',   type:'Water Bath', maxBig:2,  maxSmall:4  },
+  { cap:'15 kg/hr',  big:'2 to 3 large daig burners',  small:'4 to 8 small burners',   price:'PKR 85,000',   type:'Water Bath', maxBig:3,  maxSmall:8  },
+  { cap:'30 kg/hr',  big:'3 to 6 large daig burners',  small:'8 to 12 small burners',  price:'PKR 1,20,000', type:'Water Bath', maxBig:6,  maxSmall:12 },
+  { cap:'50 kg/hr',  big:'6 to 9 large daig burners',  small:'12 to 18 small burners', price:'PKR 1,95,000', type:'Water Bath', maxBig:9,  maxSmall:18 },
+  { cap:'30 kg/hr',  big:'3 to 6 large daig burners',  small:'8 to 12 small burners',  price:'PKR 2,00,000', type:'Waterless',  maxBig:6,  maxSmall:12 },
+  { cap:'50 kg/hr',  big:'6 to 9 large daig burners',  small:'12 to 18 small burners', price:'PKR 3,00,000', type:'Waterless',  maxBig:9,  maxSmall:18 },
 ];
 
 const FAQ = {
@@ -87,7 +87,7 @@ const FAQ = {
 };
 
 const userState = {};
-const ADMIN_NUMBER = '923177271509@c.us';
+const ADMIN_NUMBER = '923177271509';
 const stoppedNumbers = new Set();
 
 // ============================================================
@@ -99,7 +99,7 @@ const mainMenu = () => `👋 *Assalam o Alaikum!*
 Welcome to *AAA Gas Engineering!* 🔥
 
 We are specialists in *AAA LPG Vaporizers.*
-Water Bath (10–50 kg/hr) and Waterless (30–50 kg/hr) both available.
+Water Bath (10-50 kg/hr) and Waterless (30-50 kg/hr) both available.
 
 Reply with a number:
 
@@ -199,7 +199,7 @@ const faqMenu = () => `❓ *Frequently Asked Questions*
 const contactMsg = () => `📞 *AAA Gas Engineering*
 
 📱 WhatsApp / Call: *03177271509*
-🕐 Available: 9am to 8pm (Mon–Sat)
+🕐 Available: 9am to 8pm (Mon-Sat)
 
 You can message us directly on WhatsApp anytime!
 
@@ -218,158 +218,136 @@ function getProduct(count, type) {
 // MESSAGE HANDLER
 // ============================================================
 
-async function handleMessage(client, msg) {
-  const jid = msg.from;
-  if (!jid || jid === 'status@broadcast') return;
-
-  const text = msg.body.trim();
-  if (!text) return;
-
-  const send = async (message) => {
-    await client.sendMessage(jid, message);
+async function handleMessage(sock, jid, text) {
+  const send = async (msg) => {
+    await sock.sendMessage(jid, { text: msg });
   };
 
-  // ---- ADMIN COMMANDS ----
-  if (jid === ADMIN_NUMBER) {
+  // ADMIN COMMANDS
+  if (jid.includes(ADMIN_NUMBER)) {
     if (text.toUpperCase().startsWith('STOP ')) {
-      const target = text.split(' ')[1] + '@c.us';
-      stoppedNumbers.add(target);
-      await send(`✅ Bot stopped for ${text.split(' ')[1]}`);
+      const t = text.split(' ')[1] + '@s.whatsapp.net';
+      stoppedNumbers.add(t);
+      await send('✅ Bot stopped for ' + text.split(' ')[1]);
       return;
     }
     if (text.toUpperCase().startsWith('START ')) {
-      const target = text.split(' ')[1] + '@c.us';
-      stoppedNumbers.delete(target);
-      await send(`✅ Bot started for ${text.split(' ')[1]}`);
+      const t = text.split(' ')[1] + '@s.whatsapp.net';
+      stoppedNumbers.delete(t);
+      await send('✅ Bot started for ' + text.split(' ')[1]);
       return;
     }
-    if (text.toUpperCase() === 'STOPALL') {
-      userState['GLOBAL_STOP'] = true;
-      await send('✅ Bot stopped for ALL users.');
-      return;
-    }
-    if (text.toUpperCase() === 'STARTALL') {
-      userState['GLOBAL_STOP'] = false;
-      await send('✅ Bot started for ALL users.');
-      return;
-    }
+    if (text.toUpperCase() === 'STOPALL') { userState['GLOBAL_STOP'] = true; await send('✅ Bot stopped for ALL.'); return; }
+    if (text.toUpperCase() === 'STARTALL') { userState['GLOBAL_STOP'] = false; await send('✅ Bot started for ALL.'); return; }
   }
 
-  if (userState['GLOBAL_STOP'] === true) return;
+  if (userState['GLOBAL_STOP']) return;
   if (stoppedNumbers.has(jid)) return;
-  if (msg.fromMe) return;
-
   if (!userState[jid]) userState[jid] = { step: 'main' };
-  const state = userState[jid];
+  const s = userState[jid];
 
-  if (text === '0') {
-    userState[jid] = { step: 'main' };
-    await send(mainMenu());
-    return;
-  }
+  if (text === '0') { userState[jid] = { step: 'main' }; await send(mainMenu()); return; }
 
   // MAIN
-  if (state.step === 'main') {
-    const greet = ['hi','hello','hey','salam','assalam','start','menu','hii','hlw','helo'];
+  if (s.step === 'main') {
+    const greet = ['hi','hello','hey','salam','assalam','start','menu','hii','hlw','helo','assalamualaikum'];
     if (greet.includes(text.toLowerCase())) { await send(mainMenu()); return; }
-    if (text === '1') { userState[jid].step = 'products'; await send(productsMenu()); }
-    else if (text === '2') { userState[jid].step = 'recommend'; await send(recommendMenu()); }
-    else if (text === '3') { await send(FAQ.diff + '\n\n*0* - Main Menu'); }
-    else if (text === '4') { userState[jid].step = 'faq'; await send(faqMenu()); }
-    else if (text === '5') { userState[jid].step = 'quote1'; await send('📋 *Get a Quote*\n\nStep 1 of 4: Please type your *full name*.'); }
-    else if (text === '6') { await send(contactMsg()); }
-    else { await send(mainMenu()); }
+    if (text==='1'){s.step='products';await send(productsMenu());}
+    else if(text==='2'){s.step='recommend';await send(recommendMenu());}
+    else if(text==='3'){await send(FAQ.diff+'\n\n*0* - Main Menu');}
+    else if(text==='4'){s.step='faq';await send(faqMenu());}
+    else if(text==='5'){s.step='quote1';await send('📋 *Get a Quote*\n\nStep 1 of 4: Please type your *full name*.');}
+    else if(text==='6'){await send(contactMsg());}
+    else{await send(mainMenu());}
     return;
   }
 
   // PRODUCTS
-  if (state.step === 'products') {
-    if (text === '1') { userState[jid].step = 'water_bath'; await send(waterBathList()); }
-    else if (text === '2') { userState[jid].step = 'waterless'; await send(waterlessList()); }
-    else if (text === '3') { await send(FAQ.diff + '\n\n*0* - Main Menu'); }
-    else { await send(productsMenu()); }
+  if (s.step==='products'){
+    if(text==='1'){s.step='water_bath';await send(waterBathList());}
+    else if(text==='2'){s.step='waterless';await send(waterlessList());}
+    else if(text==='3'){await send(FAQ.diff+'\n\n*0* - Main Menu');}
+    else{await send(productsMenu());}
     return;
   }
 
-  if (state.step === 'water_bath') {
-    const idx = parseInt(text) - 1;
-    if (idx >= 0 && idx <= 3) { userState[jid].step = 'product_detail'; userState[jid].selectedProduct = PRODUCTS[idx]; await send(productDetail(PRODUCTS[idx])); }
-    else { await send(waterBathList()); }
+  if (s.step==='water_bath'){
+    const i=parseInt(text)-1;
+    if(i>=0&&i<=3){s.step='product_detail';s.selectedProduct=PRODUCTS[i];await send(productDetail(PRODUCTS[i]));}
+    else{await send(waterBathList());}
     return;
   }
 
-  if (state.step === 'waterless') {
-    const idx = parseInt(text) - 1;
-    if (idx >= 0 && idx <= 1) { userState[jid].step = 'product_detail'; userState[jid].selectedProduct = PRODUCTS[4 + idx]; await send(productDetail(PRODUCTS[4 + idx])); }
-    else { await send(waterlessList()); }
+  if (s.step==='waterless'){
+    const i=parseInt(text)-1;
+    if(i>=0&&i<=1){s.step='product_detail';s.selectedProduct=PRODUCTS[4+i];await send(productDetail(PRODUCTS[4+i]));}
+    else{await send(waterlessList());}
     return;
   }
 
-  if (state.step === 'product_detail') {
-    if (text === '1') { userState[jid].step = 'quote1'; await send('📋 *Get a Quote*\n\nStep 1 of 4: Please type your *full name*.'); }
-    else if (text === '2') { userState[jid].step = 'products'; await send(productsMenu()); }
-    else { await send(productDetail(state.selectedProduct)); }
+  if (s.step==='product_detail'){
+    if(text==='1'){s.step='quote1';await send('📋 *Get a Quote*\n\nStep 1 of 4: Please type your *full name*.');}
+    else if(text==='2'){s.step='products';await send(productsMenu());}
+    else{await send(productDetail(s.selectedProduct));}
     return;
   }
 
   // RECOMMEND
-  if (state.step === 'recommend') {
-    if (text === '1') { userState[jid].step = 'rec_big'; await send(bigCount()); }
-    else if (text === '2') { userState[jid].step = 'rec_small'; await send(smallCount()); }
-    else if (text === '3') { userState[jid].step = 'rec_small'; await send(smallCount()); }
-    else { await send(recommendMenu()); }
+  if (s.step==='recommend'){
+    if(text==='1'){s.step='rec_big';await send(bigCount());}
+    else if(text==='2'||text==='3'){s.step='rec_small';await send(smallCount());}
+    else{await send(recommendMenu());}
     return;
   }
 
-  if (state.step === 'rec_big') {
-    const counts = [2, 3, 6, 9, 10];
-    const idx = parseInt(text) - 1;
-    if (idx >= 0 && idx < counts.length) { const p = getProduct(counts[idx], 'big'); userState[jid].step = 'rec_result'; userState[jid].selectedProduct = p; await send(recResult(p)); }
-    else { await send(bigCount()); }
+  if (s.step==='rec_big'){
+    const counts=[2,3,6,9,10];
+    const i=parseInt(text)-1;
+    if(i>=0&&i<counts.length){const p=getProduct(counts[i],'big');s.step='rec_result';s.selectedProduct=p;await send(recResult(p));}
+    else{await send(bigCount());}
     return;
   }
 
-  if (state.step === 'rec_small') {
-    const counts = [4, 8, 12, 18, 20];
-    const idx = parseInt(text) - 1;
-    if (idx >= 0 && idx < counts.length) { const p = getProduct(counts[idx], 'small'); userState[jid].step = 'rec_result'; userState[jid].selectedProduct = p; await send(recResult(p)); }
-    else { await send(smallCount()); }
+  if (s.step==='rec_small'){
+    const counts=[4,8,12,18,20];
+    const i=parseInt(text)-1;
+    if(i>=0&&i<counts.length){const p=getProduct(counts[i],'small');s.step='rec_result';s.selectedProduct=p;await send(recResult(p));}
+    else{await send(smallCount());}
     return;
   }
 
-  if (state.step === 'rec_result') {
-    if (text === '1') { userState[jid].step = 'quote1'; await send('📋 *Get a Quote*\n\nStep 1 of 4: Please type your *full name*.'); }
-    else if (text === '2') { userState[jid].step = 'waterless'; await send(waterlessList()); }
-    else { await send(recResult(state.selectedProduct)); }
+  if (s.step==='rec_result'){
+    if(text==='1'){s.step='quote1';await send('📋 *Get a Quote*\n\nStep 1 of 4: Please type your *full name*.');}
+    else if(text==='2'){s.step='waterless';await send(waterlessList());}
+    else{await send(recResult(s.selectedProduct));}
     return;
   }
 
   // FAQ
-  if (state.step === 'faq') {
-    const keys = ['diff','install','warranty','maintain','delivery','payment','safety'];
-    const idx = parseInt(text) - 1;
-    if (idx >= 0 && idx < keys.length) { await send(FAQ[keys[idx]] + '\n\n*0* - Main Menu  |  *#* - More FAQs'); }
-    else if (text === '#') { await send(faqMenu()); }
-    else { await send(faqMenu()); }
+  if (s.step==='faq'){
+    const keys=['diff','install','warranty','maintain','delivery','payment','safety'];
+    const i=parseInt(text)-1;
+    if(i>=0&&i<keys.length){await send(FAQ[keys[i]]+'\n\n*0* - Main Menu  |  *#* - More FAQs');}
+    else if(text==='#'){await send(faqMenu());}
+    else{await send(faqMenu());}
     return;
   }
 
   // QUOTE
-  if (state.step === 'quote1') { userState[jid].quoteName = text; userState[jid].step = 'quote2'; await send(`Thank you *${text}*! 😊\n\nStep 2 of 4: How many burners do you have and what type?\n(Example: 3 large daig burners)`); return; }
-  if (state.step === 'quote2') { userState[jid].quoteBurners = text; userState[jid].step = 'quote3'; await send(`Step 3 of 4: What type of business do you run?\n\n*1* - Dhaba / Hotel\n*2* - Factory\n*3* - Fast Food\n*4* - Catering\n*5* - Industrial\n*6* - Other`); return; }
-  if (state.step === 'quote3') {
-    const biz = ['Dhaba / Hotel','Factory','Fast Food','Catering','Industrial','Other'];
-    const idx = parseInt(text) - 1;
-    userState[jid].quoteBiz = (idx >= 0 && idx < biz.length) ? biz[idx] : text;
-    userState[jid].step = 'quote4';
-    await send(`Step 4 of 4: Which city are you located in?`);
+  if(s.step==='quote1'){s.quoteName=text;s.step='quote2';await send(`Thank you *${text}*! 😊\n\nStep 2 of 4: How many burners do you have and what type?\n(Example: 3 large daig burners)`);return;}
+  if(s.step==='quote2'){s.quoteBurners=text;s.step='quote3';await send('Step 3 of 4: What type of business?\n\n*1* - Dhaba / Hotel\n*2* - Factory\n*3* - Fast Food\n*4* - Catering\n*5* - Industrial\n*6* - Other');return;}
+  if(s.step==='quote3'){
+    const biz=['Dhaba / Hotel','Factory','Fast Food','Catering','Industrial','Other'];
+    const i=parseInt(text)-1;
+    s.quoteBiz=(i>=0&&i<biz.length)?biz[i]:text;
+    s.step='quote4';
+    await send('Step 4 of 4: Which city are you located in?');
     return;
   }
-  if (state.step === 'quote4') {
-    userState[jid].quoteCity = text;
-    const q = userState[jid];
-    userState[jid].step = 'main';
-    await send(`✅ *Thank you, ${q.quoteName}!*\n\n📋 *Your details have been recorded:*\n👤 Name: ${q.quoteName}\n🔥 Burners: ${q.quoteBurners}\n🏢 Business: ${q.quoteBiz}\n📍 City: ${q.quoteCity}\n\nOur representative will contact you soon at *03177271509*! 📞\n\n*0* - 🏠 Main Menu`);
+  if(s.step==='quote4'){
+    s.quoteCity=text;
+    s.step='main';
+    await send(`✅ *Thank you, ${s.quoteName}!*\n\n📋 *Your details recorded:*\n👤 Name: ${s.quoteName}\n🔥 Burners: ${s.quoteBurners}\n🏢 Business: ${s.quoteBiz}\n📍 City: ${s.quoteCity}\n\nOur representative will contact you soon at *03177271509*! 📞\n\n*0* - 🏠 Main Menu`);
     return;
   }
 
@@ -377,51 +355,73 @@ async function handleMessage(client, msg) {
 }
 
 // ============================================================
-// WHATSAPP CLIENT
+// WHATSAPP CONNECTION
 // ============================================================
 
-const client = new Client({
-  authStrategy: new LocalAuth(),
- puppeteer: {
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-      '--disable-gpu'
-    ],
-  }
-});
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
-client.on('qr', (qr) => {
-  currentQR = qr;
-  botStatus = '✅ QR Code Ready! Open the URL to scan.';
-  console.log('QR Code generated! Open your Railway URL in browser.');
-});
+  const sock = makeWASocket({
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' })),
+    },
+    logger: P({ level: 'silent' }),
+    browser: ['AAA Gas Bot', 'Safari', '1.0'],
+    generateHighQualityLinkPreview: false,
+    syncFullHistory: false,
+  });
 
-client.on('ready', () => {
-  currentQR = null;
-  botStatus = '🎉 Bot is LIVE and connected!';
-  console.log('🎉 AAA Gas Engineering Bot is LIVE!');
-});
+  sock.ev.on('creds.update', saveCreds);
 
-client.on('disconnected', (reason) => {
-  botStatus = 'Disconnected. Restarting...';
-  console.log('Disconnected:', reason);
-  client.initialize();
-});
+  sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+    if (qr) {
+      currentQR = qr;
+      isConnected = false;
+      botStatus = 'QR Code Ready! Open URL to scan.';
+      console.log('✅ QR ready! Open Railway URL in browser.');
+    }
+    if (connection === 'open') {
+      currentQR = null;
+      isConnected = true;
+      botStatus = '🎉 Bot is LIVE!';
+      console.log('🎉 Bot is LIVE!');
+    }
+    if (connection === 'close') {
+      isConnected = false;
+      currentQR = null;
+      botStatus = 'Reconnecting...';
+      const code = lastDisconnect?.error?.output?.statusCode;
+      console.log('Connection closed, code:', code);
+      if (code !== DisconnectReason.loggedOut) {
+        setTimeout(startBot, 3000);
+      } else {
+        botStatus = 'Logged out. Please redeploy.';
+      }
+    }
+  });
 
-client.on('message', async (msg) => {
-  try {
-    await handleMessage(client, msg);
-  } catch (err) {
-    console.error('Error:', err);
-  }
-});
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    for (const msg of messages) {
+      if (msg.key.fromMe) continue;
+      if (!msg.message) continue;
+      const jid = msg.key.remoteJid;
+      if (!jid || jid === 'status@broadcast') continue;
+      const text = (
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.imageMessage?.caption ||
+        ''
+      ).trim();
+      if (!text) continue;
+      try {
+        await handleMessage(sock, jid, text);
+      } catch (e) {
+        console.error('Message error:', e.message);
+      }
+    }
+  });
+}
 
-client.initialize();
+startBot();
