@@ -382,8 +382,9 @@ async function handleMessage(client, msg) {
 
 const client = new Client({
   authStrategy: new LocalAuth(),
-  puppeteer: {
+ puppeteer: {
     headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
